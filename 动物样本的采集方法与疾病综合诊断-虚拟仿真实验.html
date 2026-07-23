@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>动物样本的采集方法与疾病综合诊断 - 3D虚拟仿真</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a2e;font-family:'Microsoft YaHei',sans-serif;color:#e0e0e0;overflow:hidden}
+#app{width:100vw;height:100vh;display:flex;flex-direction:column}
+.top-bar{height:50px;background:linear-gradient(135deg,#1a1a4e,#2a2a6e);display:flex;align-items:center;padding:0 20px;border-bottom:2px solid #4a4a8e}
+.top-bar h1{font-size:16px;color:#7fdbff;letter-spacing:1px}
+.top-bar .step-info{font-size:14px;color:#aaa;margin-left:auto}
+.main{flex:1;display:flex;overflow:hidden}
+.canvas-wrap{flex:1;position:relative;background:#0a0a2e}
+#simCanvas{width:100%;height:100%;display:block}
+.panel{width:320px;background:linear-gradient(180deg,#1e1e4e,#12123e);border-left:2px solid #4a4a8e;display:flex;flex-direction:column;overflow-y:auto}
+.step-title{font-size:15px;color:#7fdbff;padding:15px;border-bottom:1px solid #3a3a6e}
+.step-desc{font-size:12px;color:#ccc;padding:10px 15px;line-height:1.5}
+.ops{padding:8px 15px;display:flex;flex-direction:column;gap:6px}
+.op-btn{background:linear-gradient(135deg,#2e4e6e,#3e5e7e);border:1px solid #5e7e9e;color:#7fdbff;padding:8px 12px;cursor:pointer;font-size:13px;border-radius:5px;text-align:left;transition:all .2s}
+.op-btn:hover{background:linear-gradient(135deg,#3e5e8e,#4e6e9e);transform:translateX(3px)}
+.op-btn.done{background:#1e3e1e;border-color:#3e7e3e;color:#7fff7f}
+.score-bar{height:36px;background:#0a0a2e;display:flex;align-items:center;padding:0 15px;border-top:2px solid #4a4a8e}
+.score-bar .label{font-size:12px;color:#aaa}
+.score-bar .val{font-size:14px;color:#7fdbff;margin-left:8px}
+.score-bar .total{font-size:12px;color:#888;margin-left:auto}
+.progress{height:22px;background:#0a0a2e;padding:0 15px;display:flex;align-items:center;gap:3px}
+.pdot{width:16px;height:16px;border-radius:50%;border:2px solid #4a4a8e;background:transparent;cursor:pointer;position:relative}
+.pdot.active{background:#7fdbff;border-color:#7fdbff}
+.pdot.done{background:#3e7e3e;border-color:#3e7e3e}
+.result-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);display:none;z-index:1000;align-items:center;justify-content:center}
+.result-modal.show{display:flex}
+.result-card{background:linear-gradient(135deg,#1e2e4e,#2e3e6e);border:2px solid #7fdbff;padding:25px;border-radius:10px;max-width:520px;width:90%}
+.result-card h2{color:#7fdbff;font-size:20px;margin-bottom:12px;text-align:center}
+.result-card .diag-item{padding:8px;border:1px solid #3a3a6e;border-radius:6px;margin:6px 0}
+.result-card .diag-item h3{color:#7fdbff;font-size:13px}
+.result-card .diag-item p{color:#ccc;font-size:12px;line-height:1.4}
+.result-card .total-score{font-size:24px;color:#7fdbff;text-align:center;margin-top:12px}
+.close-btn{background:#7fdbff;color:#0a0a2e;padding:6px 16px;cursor:pointer;border:none;border-radius:5px;font-size:13px;margin-top:12px;display:block;margin-left:auto}
+</style></head><body>
+<div id="app">
+<div class="top-bar"><h1>动物样本的采集方法与疾病综合诊断 — 3D虚拟仿真</h1><div class="step-info" id="stepInfo">步骤 1/7</div></div>
+<div class="main">
+<div class="canvas-wrap"><canvas id="simCanvas"></canvas></div>
+<div class="panel">
+<div class="progress" id="progress"></div>
+<div class="step-title" id="stepTitle">安全评估与准备</div>
+<div class="step-desc" id="stepDesc">确认动物种类与疑似疾病→排除炭疽疑似（急性死亡+天然孔出血+尸体膨胀→禁止剖检！）→准备采样器械→穿戴防护',ops:['确认疑似疾病','排除炭疽','准备器械','穿防护服'],scene:'prepare'}</div>
+<div class="ops" id="ops"></div>
+<div class="score-bar"><span class="label">当前得分：</span><span class="val" id="curScore">0</span><span class="total">/ 80</span></div>
+</div>
+</div>
+<div class="result-modal" id="resultModal">
+<div class="result-card">
+<h2>疾病综合诊断报告</h2>
+<div class="diag-item"><h3>流行病学调查</h3><p>猪群100头，30%发病，5%死亡，近期引种混群</p></div>
+<div class="diag-item"><h3>临床检查</h3><p>高热41℃、呼吸困难、皮肤发紫、腹泻</p></div>
+<div class="diag-item"><h3>实验室检验</h3><p>细菌分离：大肠埃希菌阳性<br>血清学：猪瘟ELISA阴性<br>病理：肺脏出血性病变</p></div>
+<div class="diag-item"><h3>综合诊断结论</h3><p>确诊：大肠埃希菌败血症<br>建议：恩诺沙星治疗+环境消毒</p></div>
+<div class="total-score" id="finalScore">总分：0/80</div>
+<button class="close-btn" onclick="document.getElementById('resultModal').classList.remove('show')">关闭</button>
+</div></div></div>
+<script>
+const S=[
+{n:'安全评估与准备',d:'确认动物种类与疑似疾病→排除炭疽疑似→准备器械→穿戴防护装备→2%煤酚皂消毒尸体表面',ops:['确认疾病','排除炭疽','准备器械','穿防护服'],scene:'prepare'},
+{n:'血液样本采集',d:'猪前腔静脉采血→消毒皮肤→针头朝对侧肩关节刺入→抽取5~10mL→制备血清/全血',ops:['保定猪只','消毒采血部位','前腔静脉穿刺','抽取5~10mL','制备血清','标记保存'],scene:'blood'},
+{n:'组织器官采样',d:'剖开体腔→烧烙法消毒脏器表面→穿刺取材→放入无菌容器→一套器械一种病料',ops:['剖开胸腔','剖开腹腔','烧烙脾脏取材','烧烙肺脏取材','烧烙肝脏取材','分别入容器'],scene:'tissue'},
+{n:'其他样本采集',d:'肠管两端结扎→肠内容物→鼻拭子→直肠拭子→皮肤病料→乳汁',ops:['结扎肠管取材','肠内容物取样','鼻拭子采集','直肠拭子','皮肤病料','乳汁采样'],scene:'other'},
+{n:'样本保存运输',d:'病原分离→30%甘油盐水4℃→病理→10%福尔马林→血清→2~8℃→填写送检单→24h内送检',ops:['病原病料保存','病理组织固定','血清冷藏','填写送检单','包装运输'],scene:'transport'},
+{n:'实验室检验',d:'细菌分离鉴定→血清学检测→病理组织学检查→分子生物学检测→汇总各检验结果',ops:['细菌分离培养','生化鉴定','血清学检测','病理切片','汇总结果'],scene:'labtest'},
+{n:'综合诊断推理',d:'整合流行病学→临床检查→实验室检验→综合分析→确诊/疑似诊断→治疗方案与防控建议',ops:['流行病学分析','临床证据汇总','实验室证据汇总','综合诊断推理','出具结论方案'],scene:'diagnosis'}
+];
+let curStep=0,curOp=0,score=0,sceneAngles={x:0,y:0},zoom=1,t=0;
+const cvs=document.getElementById('simCanvas'),ctx=cvs.getContext('2d');
+let W,H,mouseDown=false,lastMX=0,lastMY=0;
+function resize(){W=cvs.clientWidth;H=cvs.clientHeight;cvs.width=W;cvs.height=H}
+window.addEventListener('resize',resize);resize();
+cvs.addEventListener('mousedown',e=>{mouseDown=true;lastMX=e.clientX;lastMY=e.clientY});
+cvs.addEventListener('mouseup',()=>mouseDown=false);
+cvs.addEventListener('mousemove',e=>{if(mouseDown){sceneAngles.y+=(e.clientX-lastMX)*0.005;sceneAngles.x+=(e.clientY-lastMY)*0.005;lastMX=e.clientX;lastMY=e.clientY}});
+cvs.addEventListener('wheel',e=>{zoom=Math.max(0.5,Math.min(3,zoom-e.deltaY*0.001))});
+
+function project(x,y,z){
+const cx=Math.cos(sceneAngles.x),sx=Math.sin(sceneAngles.x),cy=Math.cos(sceneAngles.y),sy=Math.sin(sceneAngles.y);
+let y1=y*cx-z*sx,z1=y*sx+z*cx,x1=x*cy+z1*sy,z2=x*-sy+z1*cy;
+const d=600,s=d/(d+z2*zoom);
+return{x:W/2+x1*s*zoom,y:H/2+y1*s*zoom,s,z2};
+}
+
+function drawStep(){
+ctx.clearRect(0,0,W,H);t+=0.02;
+const sc=curStep;
+if(sc===0) drawPrepare();
+else if(sc===1) drawBlood();
+else if(sc===2) drawTissue();
+else if(sc===3) drawOther();
+else if(sc===4) drawTransport();
+else if(sc===5) drawLabTest();
+else drawDiagnosis();
+}
+
+function drawPrepare(){
+// animal silhouette
+const ax=project(0,0,0);
+ctx.fillStyle='#606080';
+ctx.beginPath();ctx.ellipse(ax.x,ax.y-30*ax.s,50*ax.s,40*ax.s,0,0,Math.PI*2);ctx.fill();
+ctx.fillRect(ax.x-30*ax.s,ax.y+10*ax.s,60*ax.s,80*ax.s);
+// safety sign
+if(curOp>=1){
+ctx.fillStyle='#3e7e3e';ctx.font=`${14*ax.s}px sans-serif`;
+ctx.fillText('炭疽排除 ✓',ax.x-50*ax.s,ax.y-80*ax.s);
+}
+if(curOp>=3){
+// PPE symbols
+ctx.fillStyle='#7fdbff';ctx.font='12px sans-serif';
+ctx.fillText('🧤手套 ✓  😷口罩 ✓  🥼防护服 ✓',ax.x-80*ax.s,ax.y+120*ax.s);
+}
+ctx.fillStyle='#7fdbff';ctx.font='14px sans-serif';
+ctx.fillText('安全评估 - 操作'+(curOp+1),W/2-80,H-25);
+}
+
+function drawBlood(){
+// syringe
+const sx2=project(0,0,0);
+if(curOp>=2){
+ctx.fillStyle='#d0e0f0';ctx.fillRect(sx2.x-10*sx2.s,sx2.y-80*sx2.s,20*sx2.s,100*sx2.s);
+ctx.fillStyle='#ff6040';ctx.fillRect(sx2.x-8*sx2.s,sx2.y-20*sx2.s,16*sx2.s,40*sx2.s);
+ctx.strokeStyle='#7fdbff';ctx.lineWidth=1;ctx.strokeRect(sx2.x-10*sx2.s,sx2.y-80*sx2.s,20*sx2.s,100*sx2.s);
+// needle
+ctx.fillStyle'#808080';ctx.fillRect(sx2.x-2,sx2.y+20*sx2.s,4,30*sx2.s);
+}
+// blood tubes
+if(curOp>=4){
+for(let i=0;i<2;i++){
+const tp=project(80+i*40,0,0);
+ctx.fillStyle=i===0?'#ff4040':'#d0e0f0';
+ctx.fillRect(tp.x-10*tp.s,tp.y-60*tp.s,20*tp.s,60*tp.s);
+ctx.fillStyle='#7fdbff';ctx.font=`${8*tp.s}px sans-serif`;
+ctx.fillText(i===0?'全血':'血清',tp.x-12*tp.s,tp.y+15*tp.s);
+}
+}
+ctx.fillStyle='#7fdbff';ctx.font='14px sans-serif';ctx.fillText('采血 - 操作'+(curOp+1),W/2-80,H-25);
+}
+
+function drawTissue(){
+// organs
+const organs=[{n:'脾脏',c:'#8a3a3a',x:-80,y:0},{n:'肺脏',c:'#c0a0a0',x:0,y:0},{n:'肝脏',c:'#8a5a2a',x:80,y:0}];
+organs.forEach((o,i)=>{
+const op=project(o.x,o.y,0);
+const r=40*op.s;
+ctx.fillStyle=o.c;
+if(curOp>=i+2){ctx.beginPath();ctx.ellipse(op.x,op.y,r,r*0.5,0,0,Math.PI*2);ctx.fill();}
+else{ctx.fillStyle='#606080';ctx.beginPath();ctx.ellipse(op.x,op.y,r,r*0.5,0,0,Math.PI*2);ctx.fill();}
+ctx.strokeStyle='#7fdbff';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(op.x,op.y,r,r*0.5,0,0,Math.PI*2);ctx.stroke();
+ctx.fillStyle='#7fdbff';ctx.font=`${10*op.s}px sans-serif`;ctx.fillText(o.n,op.x-15*op.s,op.y+r*0.6);
+});
+// containers
+if(curOp>=5){
+for(let i=0;i<3;i++){
+const cp=project(-80+i*80,80,0);
+ctx.fillStyle='#406080';ctx.fillRect(cp.x-15*cp.s,cp.y-30*cp.s,30*cp.s,30*cp.s);
+ctx.strokeStyle='#7fdbff';ctx.lineWidth=0.5;ctx.strokeRect(cp.x-15*cp.s,cp.y-30*cp.s,30*cp.s,30*cp.s);
+}
+}
+ctx.fillStyle='#7fdbff';ctx.font='14px sans-serif';ctx.fillText('组织采样 - 操作'+(curOp+1),W/2-80,H-25);
+}
+
+function drawOther(){
+const items=[{n:'肠管',c:'#8a6a50',x:-120},{n:'肠内容物',c:'#6a5a40',x:-60},{n:'鼻拭子',c:'#d0e0f0',x:0},{n:'直肠拭子',c:'#d0e0f0',x:60},{n:'皮肤病料',c:'#8a7050',x:120},{n:'乳汁',c:'#f0f0d0',x:180}];
+items.forEach((it,i)=>{
+const ip=project(it.x,0,0);
+if(curOp>=i+1){
+ctx.fillStyle=it.c;
+ctx.fillRect(ip.x-20*ip.s,ip.y-25*ip.s,40*ip.s,50*ip.s);
+ctx.strokeStyle='#7fdbff';ctx.lineWidth=0.5;ctx.strokeRect(ip.x-20*ip.s,ip.y-25*ip.s,40*ip.s,50*ip.s);
+ctx.fillStyle='#7fdbff';ctx.font=`${8*ip.s}px sans-serif`;ctx.fillText(it.n,ip.x-15*ip.s,ip.y+30*ip.s);
+}
+});
+ctx.fillStyle='#7fdbff';ctx.font='14px sans-serif';ctx.fillText('其他样本 - 操作'+(curOp+1),W/2-80,H-25);
+}
+
+function drawTransport(){
+// storage containers
+const bx=project(0,0,0);
+ctx.fillStyle='#505070';ctx.fillRect(bx.x-150*bx.s,bx.y-80*bx.s,300*bx.s,160*bx.s);
+ctx.strokeStyle='#7fdbff';ctx.lineWidth=2;ctx.strokeRect(bx.x-150*bx.s,bx.y-80*bx.s,300*bx.s,160*bx.s);
+ctx.fillStyle='#7fdbff';ctx.font=`${10*bx.s}px sans-serif`;
+if(curOp>=1) ctx.fillText('30%甘油盐水 4℃',bx.x-130*bx.s,bx.y-50*bx.s);
+if(curOp>=2) ctx.fillText('10%福尔马林 固定',bx.x-130*bx.s,bx.y-20*bx.s);
+if(curOp>=3) ctx.fillText('血清 2~8℃ 冷藏',bx.x-130*bx.s,bx.y+10*bx.s);
+if(curOp>=4) ctx.fillText('送检单 ✓',bx.x-130*bx.s,bx.y+40*bx.s);
+if(curOp>=5) ctx.fillText('冰瓶运输 24h内送达',bx.x-130*bx.s,bx.y+70*bx.s);
+ctx.fillStyle='#7fdbff';ctx.font='14px sans-serif';ctx.fillText('保存运输 - 操作'+(curOp+1),W/2-80,H-25);
+}
+
+function drawLabTest(){
+// lab bench
+ctx.fillStyle='#2a2a4e';ctx.fillRect(W/4,H/4,W/2,H/2);
+ctx.strokeStyle='#7fdbff';ctx.lineWidth=2;ctx.strokeRect(W/4,H/4,W/2,H/2);
+ctx.fillStyle='#7fdbff';ctx.font='14px sans-serif';
+const tests=['细菌分离培养','生化鉴定','ELISA检测','病理切片','结果汇总'];
+tests.forEach((t2,i)=>{
+if(curOp>=i+1){
+ctx.fillStyle='#3e7e3e';ctx.fillText('✓ '+t2,W/2-80,H/2-60+i*30);
+}else{
+ctx.fillStyle='#888';ctx.fillText('  '+t2,W/2-80,H/2-60+i*30);
+}
+});
+ctx.fillStyle='#7fdbff';ctx.font='14px sans-serif';ctx.fillText('实验室检验 - 操作'+(curOp+1),W/2-80,H-25);
+}
+
+function drawDiagnosis(){
+ctx.fillStyle='#1e1e4e';ctx.fillRect(0,0,W,H);
+ctx.fillStyle='#7fdbff';ctx.font='18px sans-serif';ctx.fillText('疾病综合诊断推理',W/2-90,H/2-140);
+ctx.fillStyle='#ccc';ctx.font='13px sans-serif';
+const diag=['流行病学: 猪群100头,30%发病,5%死亡',
+'临床表现: 高热41℃,呼吸困难,皮肤发紫',
+'病原分离: 大肠埃希菌阳性',
+'血清学: 猪瘟ELISA阴性',
+'诊断结论: 大肠埃希菌败血症(确诊)',
+'方案: 恩诺沙星+环境消毒+隔离'];
+diag.forEach((d,i)=>{
+ctx.fillStyle=curOp>=i+1?'#7fff7f':'#888';
+ctx.fillText(d,W/2-120,H/2-100+i*25);
+});
+ctx.fillStyle='#7fdbff';ctx.font='22px sans-serif';ctx.fillText('综合评分: '+score+'/80',W/2-80,H/2+80);
+}
+
+function speak(text){const u=new SpeechSynthesisUtterance(text);u.lang='zh-CN';u.pitch=0.75;u.rate=0.85;speechSynthesis.speak(u)}
+
+function updateUI(){
+const step=S[curStep];
+document.getElementById('stepTitle').textContent=step.n;
+document.getElementById('stepDesc').textContent=step.d;
+document.getElementById('stepInfo').textContent='步骤 '+((curStep+1))+'/7';
+document.getElementById('curScore').textContent=score;
+const opsDiv=document.getElementById('ops');opsDiv.innerHTML='';
+step.ops.forEach((op,i)=>{
+const btn=document.createElement('div');
+btn.className='op-btn'+(i<curOp?' done':'');
+btn.textContent=(i<curOp?'✓ ':'')+(i+1)+'. '+op;
+btn.onclick=()=>doOp(i);
+opsDiv.appendChild(btn);
+});
+const prog=document.getElementById('progress');prog.innerHTML='';
+S.forEach((s,i)=>{
+const dot=document.createElement('div');
+dot.className='pdot'+(i===curStep?' active':i<curStep?' done':'');
+dot.setAttribute('data-label',s.n);
+dot.onclick=()=>{if(i<=curStep){curStep=i;curOp=0;updateUI()}};
+prog.appendChild(dot);
+});
+}
+
+function doOp(i){
+if(i!==curOp)return;score+=2;curOp++;
+speak(S[curStep].ops[i]+' - 完成');
+if(curOp>=S[curStep].ops.length){
+if(curStep<S.length-1){curStep++;curOp=0;speak('进入步骤：'+S[curStep].n);}
+else{speak('实验全部完成');showResults();}
+}
+updateUI();
+}
+
+function showResults(){document.getElementById('resultModal').classList.add('show');document.getElementById('finalScore').textContent='总分：'+score+'/80'}
+
+function animate(){drawStep();requestAnimationFrame(animate)}
+updateUI();animate();
+</script></body></html>
