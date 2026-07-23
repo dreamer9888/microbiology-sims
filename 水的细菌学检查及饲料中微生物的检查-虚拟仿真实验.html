@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>水的细菌学检查及饲料中微生物的检查 - 3D虚拟仿真</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a2e;font-family:'Microsoft YaHei',sans-serif;color:#e0e0e0;overflow:hidden}
+#app{width:100vw;height:100vh;display:flex;flex-direction:column}
+.top-bar{height:50px;background:linear-gradient(135deg,#1a1a4e,#2a2a6e);display:flex;align-items:center;padding:0 20px;border-bottom:2px solid #4a4a8e}
+.top-bar h1{font-size:16px;color:#7fdbff;letter-spacing:1px}
+.top-bar .step-info{font-size:14px;color:#aaa;margin-left:auto}
+.main{flex:1;display:flex;overflow:hidden}
+.canvas-wrap{flex:1;position:relative;background:#0a0a2e}
+#simCanvas{width:100%;height:100%;display:block}
+.panel{width:320px;background:linear-gradient(180deg,#1e1e4e,#12123e);border-left:2px solid #4a4a8e;display:flex;flex-direction:column;overflow-y:auto}
+.step-title{font-size:15px;color:#7fdbff;padding:15px;border-bottom:1px solid #3a3a6e}
+.step-desc{font-size:12px;color:#ccc;padding:10px 15px;line-height:1.5}
+.ops{padding:8px 15px;display:flex;flex-direction:column;gap:6px}
+.op-btn{background:linear-gradient(135deg,#2e4e6e,#3e5e7e);border:1px solid #5e7e9e;color:#7fdbff;padding:8px 12px;cursor:pointer;font-size:13px;border-radius:5px;text-align:left;transition:all .2s}
+.op-btn:hover{background:linear-gradient(135deg,#3e5e8e,#4e6e9e);transform:translateX(3px)}
+.op-btn.done{background:#1e3e1e;border-color:#3e7e3e;color:#7fff7f}
+.score-bar{height:36px;background:#0a0a2e;display:flex;align-items:center;padding:0 15px;border-top:2px solid #4a4a8e}
+.score-bar .label{font-size:12px;color:#aaa}
+.score-bar .val{font-size:14px;color:#7fdbff;margin-left:8px}
+.score-bar .total{font-size:12px;color:#888;margin-left:auto}
+.progress{height:22px;background:#0a0a2e;padding:0 15px;display:flex;align-items:center;gap:3px}
+.pdot{width:16px;height:16px;border-radius:50%;border:2px solid #4a4a8e;background:transparent;cursor:pointer;position:relative}
+.pdot.active{background:#7fdbff;border-color:#7fdbff}
+.pdot.done{background:#3e7e3e;border-color:#3e7e3e}
+.result-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);display:none;z-index:1000;align-items:center;justify-content:center}
+.result-modal.show{display:flex}
+.result-card{background:linear-gradient(135deg,#1e2e4e,#2e3e6e);border:2px solid #7fdbff;padding:25px;border-radius:10px;max-width:480px;width:90%}
+.result-card h2{color:#7fdbff;font-size:20px;margin-bottom:12px;text-align:center}
+.result-card .section{margin:8px 0;padding:8px;border:1px solid #3a3a6e;border-radius:6px}
+.result-card .section h3{color:#7fdbff;font-size:14px;margin-bottom:5px}
+.result-card .section p{color:#ccc;font-size:12px;line-height:1.4}
+.result-card .total-score{font-size:24px;color:#7fdbff;text-align:center;margin-top:12px}
+.close-btn{background:#7fdbff;color:#0a0a2e;padding:6px 16px;cursor:pointer;border:none;border-radius:5px;font-size:13px;margin-top:12px;display:block;margin-left:auto}
+</style></head><body>
+<div id="app">
+<div class="top-bar"><h1>水的细菌学检查及饲料中微生物的检查 — 3D虚拟仿真</h1><div class="step-info" id="stepInfo">步骤 1/8</div></div>
+<div class="main">
+<div class="canvas-wrap"><canvas id="simCanvas"></canvas></div>
+<div class="panel">
+<div class="progress" id="progress"></div>
+<div class="step-title" id="stepTitle">水样采集</div>
+<div class="step-desc" id="stepDesc">用无菌采样瓶采集水样。自来水需火焰消毒龙头后放水3min再采样；河水需无菌瓶浸入水下10~15cm处。4℃冷藏，6h内检测。</div>
+<div class="ops" id="ops"></div>
+<div class="score-bar"><span class="label">当前得分：</span><span class="val" id="curScore">0</span><span class="total">/ 100</span></div>
+</div>
+</div>
+<div class="result-modal" id="resultModal">
+<div class="result-card">
+<h2>水质与饲料微生物检测结果</h2>
+<div class="section"><h3>水质检测结果</h3><p id="waterResult">细菌总数：-- CFU/mL<br>大肠菌群：-- MPN/100mL<br>判定：待检</p></div>
+<div class="section"><h3>饲料检测结果</h3><p id="feedResult">菌落总数：-- CFU/g<br>霉菌酵母：-- CFU/g<br>判定：待检</p></div>
+<div class="total-score" id="finalScore">总分：0/100</div>
+<button class="close-btn" onclick="document.getElementById('resultModal').classList.remove('show')">关闭</button>
+</div></div></div>
+<script>
+const S=[
+{n:'水样采集',d:'无菌采样瓶采集水样→自来水：火焰消毒龙头+放水3min→河水：无菌瓶水下10~15cm→4℃冷藏6h内检测',ops:['消毒龙头','放水冲洗','无菌采样','冷藏标记'],scene:'water_sample'},
+{n:'细菌总数测定',d:'取1mL水样注入平皿→倾注15mL PCA琼脂→旋转混匀→凝固→36℃培养48h→计数菌落',ops:['取1mL水样','倾注PCA琼脂','旋转混匀','静置凝固','36℃培养48h','计数菌落'],scene:'plate_count'},
+{n:'大肠菌群初发酵',d:'10mL/1mL/0.1mL水样各5管接种乳糖蛋白胨发酵管→36℃24h→产酸产气为阳性',ops:['接种10mL×5管','接种1mL×5管','接种0.1mL×5管','36℃培养24h','观察产酸产气'],scene:'ferment1'},
+{n:'大肠菌群复发酵+证实',d:'阳性管转种BGLB管→36℃24h→再次产酸产气→划线EMB平板→典型菌落证实',ops:['转种BGLB管','36℃培养24h','划线EMB平板','培养18~24h','挑取典型菌落'],scene:'ferment2'},
+{n:'饲料取样均质',d:'无菌称取25g饲料→加入225mL稀释液→拍击式均质2min→10倍梯度稀释至10⁻⁵',ops:['称取25g饲料','加入225mL稀释液','均质2min','10⁻¹稀释','10⁻²稀释','10⁻³稀释'],scene:'feed_prep'},
+{n:'饲料菌落总数',d:'选取2~3个稀释度→每度1mL注入平皿→倾注PCA→36℃48h→计数30~300CFU范围',ops:['选取稀释度','取1mL×2平行','倾注PCA琼脂','36℃培养48h','计数菌落','计算CFU/g'],scene:'feed_count'},
+{n:'霉菌酵母计数',d:'取1mL稀释液注入平皿→倾注孟加拉红琼脂（含氯霉素）→25~28℃培养5~7d→计数',ops:['取稀释液','倾注孟加拉红琼脂','25~28℃培养','培养5~7天','计数霉菌酵母','计算结果'],scene:'mold'},
+{n:'结果综合评价',d:'对照国家标准判读水质和饲料微生物卫生质量→出具检测报告→给出合格/不合格结论',ops:['水质标准对照','饲料标准对照','综合评价','出具报告'],scene:'report'}
+];
+let curStep=0,curOp=0,score=0,sceneAngles={x:0,y:0},zoom=1,t=0;
+const cvs=document.getElementById('simCanvas'),ctx=cvs.getContext('2d');
+let W,H,mouseDown=false,lastMX=0,lastMY=0;
+function resize(){W=cvs.clientWidth;H=cvs.clientHeight;cvs.width=W;cvs.height=H}
+window.addEventListener('resize',resize);resize();
+cvs.addEventListener('mousedown',e=>{mouseDown=true;lastMX=e.clientX;lastMY=e.clientY});
+cvs.addEventListener('mouseup',()=>mouseDown=false);
+cvs.addEventListener('mousemove',e=>{if(mouseDown){sceneAngles.y+=(e.clientX-lastMX)*0.005;sceneAngles.x+=(e.clientY-lastMY)*0.005;lastMX=e.clientX;lastMY=e.clientY}});
+cvs.addEventListener('wheel',e=>{zoom=Math.max(0.5,Math.min(3,zoom-e.deltaY*0.001))});
+
+function project(x,y,z){
+const cx=Math.cos(sceneAngles.x),sx=Math.sin(sceneAngles.x),cy=Math.cos(sceneAngles.y),sy=Math.sin(sceneAngles.y);
+let y1=y*cx-z*sx,z1=y*sx+z*cx,x1=x*cy+z1*sy,z2=x*-sy+z1*cy;
+const d=600,s=d/(d+z2*zoom);
+return{x:W/2+x1*s*zoom,y:H/2+y1*s*zoom,s,z2};
+}
+
+function drawStep(){
+ctx.clearRect(0,0,W,H);t+=0.02;
+const sc=curStep;
+if(sc===0) drawWaterSample();
+else if(sc===1) drawPlateCount();
+else if(sc===2) drawFerment1();
+else if(sc===3) drawFerment2();
+else if(sc===4) drawFeedPrep();
+else if(sc===5) drawFeedCount();
+else if(sc===6) drawMold();
+else drawReport();
+}
+
+function drawWaterSample(){
+const bx=project(0,0,0);
+// water bottle
+ctx.fillStyle='#4060a0';
+ctx.fillRect(bx.x-40*bx.s,bx.y-100*bx.s,80*bx.s,120*bx.s);
+ctx.fillStyle='#6090d0';
+ctx.fillRect(bx.x-35*bx.s,bx.y-70*bx.s,70*bx.s,80*bx.s);
+ctx.strokeStyle='#7fdbff';ctx.lineWidth=1.5;ctx.strokeRect(bx.x-40*bx.s,bx.y-100*bx.s,80*bx.s,120*bx.s);
+// faucet (step 0-1)
+if(curOp<2){
+const fx=project(-120,0,0);
+ctx.fillStyle='#808080';ctx.fillRect(fx.x-30*fx.s,fx.y-20*fx.s,60*fx.s,40*fx.s);
+ctx.fillStyle='#606060';ctx.fillRect(fx.x-10*fx.s,fx.y+20*fx.s,20*fx.s,30*fx.s);
+if(curOp>=1){
+ctx.fillStyle='#60a0ff';ctx.fillRect(fx.x-8*fx.s,fx.y+50*fx.s,16*fx.s,40*fx.s);
+}
+}
+// ice box (step 3)
+if(curOp>=3){
+const ib=project(120,0,0);
+ctx.fillStyle='#505070';ctx.fillRect(ib.x-50*ib.s,ib.y-40*ib.s,100*ib.s,80*ib.s);
+ctx.fillStyle='#7fdbff';ctx.font=`${10*ib.s}px sans-serif`;ctx.fillText('4°C',ib.x-15*ib.s,ib.y+5*ib.s);
+}
+ctx.fillStyle='#7fdbff';ctx.font='14px sans-serif';
+ctx.fillText('水样采集 - 操作'+(curOp+1),W/2-80,H-25);
+}
+
+function drawPlateCount(){
+const pc=project(0,0,0);
+const r=120*pc.s;
+ctx.fillStyle='#c8a050';ctx.beginPath();ctx.ellipse(pc.x,pc.y,r,r*0.25,0,0,Math.PI*2);ctx.fill();
+if(curOp>=3){
+ctx.strokeStyle='#806040';ctx.lineWidth=1;
+ctx.beginPath();ctx.ellipse(pc.x,pc.y,r*0.7,r*0.18,0,0,Math.PI*2);ctx.stroke();
+}
+if(curOp>=5){
+// colonies
+ctx.fillStyle='#ff8040';
+for(let i=0;i<15;i++){
+const cx2=pc.x+(Math.random()-0.5)*r*0.6;
+const cy2=pc.y+(Math.random()-0.5)*r*0.15;
+ctx.beginPath();ctx.arc(cx2,cy2,3+i%2,0,Math.PI*2);ctx.fill();
+}
+ctx.fillStyle='#7fdbff';ctx.font='12px sans-serif';ctx.fillText('菌落计数: 85 CFU/mL',pc.x-60,pc.y+r*0.4);
+}
+ctx.strokeStyle='#aa8040';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(pc.x,pc.y,r,r*0.25,0,0,Math.PI*2);ctx.stroke();
+ctx.fillStyle='#7fdbff';ctx.font='14px sans-serif';ctx.fillText('细菌总数测定 - 操作'+(curOp+1),W/2-80,H-25);
+}
+
+function drawFerment1(){
+for(let row=0;row<3;row++){
+for(let col=0;col<5;col++){
+const tp=project(-100+col*50, -30+row*30, 0);
+const h=25*tp.s,w=16*tp.s;
+const isPos=curOp>=4&&(row===0&&col<2||row===1&&col<3);
+ctx.fillStyle=isPos?'#b8860b':'#406080';
+ctx.fillRect(tp.x-w/2,tp.y-h,w,h);
+ctx.strokeStyle='#7fdbff';ctx.lineWidth=0.5;ctx.strokeRect(tp.x-w/2,tp.y-h,w,h);
+if(isPos){
+ctx.fillStyle='#ff8040';ctx.beginPath();ctx.arc(tp.x,tp.y-h+5,2,0,Math.PI*2);ctx.fill();
+}
+}
+}
+ctx.fillStyle='#7fdbff';ctx.font='12px sans-serif';
+ctx.fillText('10mL×5 | 1mL×5 | 0.1mL×5',W/2-80,H-50);
+ctx.fillText('初发酵 - 操作'+(curOp+1),W/2-80,H-25);
+}
+
+function drawFerment2(){
+// EMB plate
+const pc=project(0,0,0);
+const r=100*pc.s;
+ctx.fillStyle='#2a1a4a';ctx.beginPath();ctx.ellipse(pc.x,pc.y,r,r*0.25,0,0,Math.PI*2);ctx.fill();
+if(curOp>=4){
+// metallic sheen colonies
+ctx.fillStyle='#c0a0ff';
+for(let i=0;i<8;i++){
+const cx2=pc.x+(Math.random()-0.5)*r*0.5;
+const cy2=pc.y+(Math.random()-0.5)*r*0.1;
+ctx.beginPath();ctx.arc(cx2,cy2,4,0,Math.PI*2);ctx.fill();
+}
+ctx.fillStyle='#7fdbff';ctx.font='12px sans-serif';
+ctx.fillText('金属光泽菌落→大肠菌群阳性',pc.x-80,pc.y+r*0.4);
+}
+ctx.strokeStyle='#5a3a8a';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(pc.x,pc.y,r,r*0.25,0,0,Math.PI*2);ctx.stroke();
+ctx.fillStyle='#7fdbff';ctx.font='14px sans-serif';ctx.fillText('复发酵+证实 - 操作'+(curOp+1),W/2-80,H-25);
+}
+
+function drawFeedPrep(){
+// sample bag
+const bx=project(0,0,0);
+ctx.fillStyle='#8a7050';ctx.fillRect(bx.x-60*bx.s,bx.y-40*bx.s,120*bx.s,80*bx.s);
+ctx.fillStyle='#7fdbff';ctx.font=`${12*bx.s}px sans-serif`;ctx.fillText('饲料25g',bx.x-30*bx.s,bx.y+5*bx.s);
+// dilution tubes
+for(let i=0;i<4;i++){
+const tp=project(80+i*30,0,0);
+const h=80*tp.s,w=20*tp.s;
+ctx.fillStyle=curOp>=4+i?'#c8a050':'#406080';
+ctx.fillRect(tp.x-w/2,tp.y-h,w,h);
+ctx.strokeStyle='#7fdbff';ctx.lineWidth=0.5;ctx.strokeRect(tp.x-w/2,tp.y-h,w,h);
+ctx.fillStyle='#7fdbff';ctx.font=`${8*tp.s}px sans-serif`;
+ctx.fillText('10⁻'+(i+1),tp.x-10*tp.s,tp.y+15*tp.s);
+}
+ctx.fillStyle='#7fdbff';ctx.font='14px sans-serif';ctx.fillText('饲料取样均质 - 操作'+(curOp+1),W/2-80,H-25);
+}
+
+function drawFeedCount(){
+const pc=project(0,0,0);
+const r=120*pc.s;
+ctx.fillStyle='#c8a050';ctx.beginPath();ctx.ellipse(pc.x,pc.y,r,r*0.25,0,0,Math.PI*2);ctx.fill();
+if(curOp>=5){
+ctx.fillStyle='#ff8040';
+for(let i=0;i<25;i++){
+const cx2=pc.x+(Math.random()-0.5)*r*0.5;
+const cy2=pc.y+(Math.random()-0.5)*r*0.12;
+ctx.beginPath();ctx.arc(cx2,cy2,2+Math.random()*2,0,Math.PI*2);ctx.fill();
+}
+ctx.fillStyle='#7fdbff';ctx.font='12px sans-serif';ctx.fillText('菌落: 150 CFU → 1.5×10⁴ CFU/g',pc.x-90,pc.y+r*0.4);
+}
+ctx.strokeStyle='#aa8040';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(pc.x,pc.y,r,r*0.25,0,0,Math.PI*2);ctx.stroke();
+ctx.fillStyle='#7fdbff';ctx.font='14px sans-serif';ctx.fillText('饲料菌落总数 - 操作'+(curOp+1),W/2-80,H-25);
+}
+
+function drawMold(){
+const pc=project(0,0,0);
+const r=120*pc.s;
+ctx.fillStyle='#8a2a4a';ctx.beginPath();ctx.ellipse(pc.x,pc.y,r,r*0.25,0,0,Math.PI*2);ctx.fill();
+if(curOp>=5){
+// mold colonies (fluffy)
+ctx.fillStyle='#5a3a1a';
+for(let i=0;i<6;i++){
+const cx2=pc.x+(Math.random()-0.5)*r*0.4;
+const cy2=pc.y+(Math.random()-0.5)*r*0.1;
+ctx.beginPath();ctx.arc(cx2,cy2,8+Math.random()*4,0,Math.PI*2);ctx.fill();
+}
+// yeast colonies (smooth)
+ctx.fillStyle='#d0a060';
+for(let i=0;i<4;i++){
+const cx2=pc.x+(Math.random()-0.5)*r*0.3;
+const cy2=pc.y+(Math.random()-0.5)*r*0.08;
+ctx.beginPath();ctx.arc(cx2,cy2,3,0,Math.PI*2);ctx.fill();
+}
+ctx.fillStyle='#7fdbff';ctx.font='12px sans-serif';ctx.fillText('霉菌6+酵母4 → 800 CFU/g',pc.x-80,pc.y+r*0.4);
+}
+ctx.strokeStyle='#5a2a4a';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(pc.x,pc.y,r,r*0.25,0,0,Math.PI*2);ctx.stroke();
+ctx.fillStyle='#7fdbff';ctx.font='14px sans-serif';ctx.fillText('霉菌酵母计数 - 操作'+(curOp+1),W/2-80,H-25);
+}
+
+function drawReport(){
+ctx.fillStyle='#1e1e4e';ctx.fillRect(0,0,W,H);
+ctx.fillStyle='#7fdbff';ctx.font='18px sans-serif';ctx.fillText('检测报告',W/2-50,H/2-140);
+ctx.fillStyle='#ccc';ctx.font='13px sans-serif';
+ctx.fillText('水质检测：',W/2-140,H/2-100);
+ctx.fillText('  细菌总数: 85 CFU/mL (标准≤100) ✓合格',W/2-140,H/2-80);
+ctx.fillText('  大肠菌群: 0 MPN/100mL (不得检出) ✓合格',W/2-140,H/2-60);
+ctx.fillText('饲料检测：',W/2-140,H/2-30);
+ctx.fillText('  菌落总数: 1.5×10⁴ CFU/g (标准≤10⁴) ✗超标',W/2-140,H/2-10);
+ctx.fillText('  霉菌酵母: 800 CFU/g (标准≤10³) ✓合格',W/2-140,H/2+10);
+ctx.fillStyle='#ff6060';ctx.font='14px sans-serif';ctx.fillText('⚠ 饲料菌落总数超标，建议追溯污染来源',W/2-140,H/2+50);
+ctx.fillStyle='#7fdbff';ctx.font='22px sans-serif';ctx.fillText('综合评分: '+score+'/100',W/2-80,H/2+100);
+}
+
+function speak(text){const u=new SpeechSynthesisUtterance(text);u.lang='zh-CN';u.pitch=0.75;u.rate=0.85;speechSynthesis.speak(u)}
+
+function updateUI(){
+const step=S[curStep];
+document.getElementById('stepTitle').textContent=step.n;
+document.getElementById('stepDesc').textContent=step.d;
+document.getElementById('stepInfo').textContent='步骤 '+((curStep+1))+'/8';
+document.getElementById('curScore').textContent=score;
+const opsDiv=document.getElementById('ops');opsDiv.innerHTML='';
+step.ops.forEach((op,i)=>{
+const btn=document.createElement('div');
+btn.className='op-btn'+(i<curOp?' done':'');
+btn.textContent=(i<curOp?'✓ ':'')+(i+1)+'. '+op;
+btn.onclick=()=>doOp(i);
+opsDiv.appendChild(btn);
+});
+const prog=document.getElementById('progress');prog.innerHTML='';
+S.forEach((s,i)=>{
+const dot=document.createElement('div');
+dot.className='pdot'+(i===curStep?' active':i<curStep?' done':'');
+dot.setAttribute('data-label',s.n);
+dot.onclick=()=>{if(i<=curStep){curStep=i;curOp=0;updateUI()}};
+prog.appendChild(dot);
+});
+}
+
+function doOp(i){
+if(i!==curOp)return;score+=2;curOp++;
+speak(S[curStep].ops[i]+' - 完成');
+if(curOp>=S[curStep].ops.length){
+if(curStep<S.length-1){curStep++;curOp=0;speak('进入步骤：'+S[curStep].n);}
+else{speak('实验全部完成');showResults();}
+}
+updateUI();
+}
+
+function showResults(){
+document.getElementById('resultModal').classList.add('show');
+document.getElementById('waterResult').innerHTML='细菌总数：85 CFU/mL ✓合格<br>大肠菌群：0 MPN/100mL ✓合格';
+document.getElementById('feedResult').innerHTML='菌落总数：1.5×10⁴ CFU/g ✗超标<br>霉菌酵母：800 CFU/g ✓合格';
+document.getElementById('finalScore').textContent='总分：'+score+'/100';
+}
+
+function animate(){drawStep();requestAnimationFrame(animate)}
+updateUI();animate();
+</script></body></html>
