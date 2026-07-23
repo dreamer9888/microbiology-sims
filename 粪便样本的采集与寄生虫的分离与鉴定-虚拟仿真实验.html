@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>粪便样本的采集与寄生虫的分离与鉴定 - 3D虚拟仿真</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a2e;font-family:'Microsoft YaHei',sans-serif;color:#e0e0e0;overflow:hidden}
+#app{width:100vw;height:100vh;display:flex;flex-direction:column}
+.top-bar{height:50px;background:linear-gradient(135deg,#1a1a4e,#2a2a6e);display:flex;align-items:center;padding:0 20px;border-bottom:2px solid #4a4a8e}
+.top-bar h1{font-size:16px;color:#7fdbff;letter-spacing:1px}
+.top-bar .step-info{font-size:14px;color:#aaa;margin-left:auto}
+.main{flex:1;display:flex;overflow:hidden}
+.canvas-wrap{flex:1;position:relative;background:#0a0a2e}
+#simCanvas{width:100%;height:100%;display:block}
+.panel{width:320px;background:linear-gradient(180deg,#1e1e4e,#12123e);border-left:2px solid #4a4a8e;display:flex;flex-direction:column;overflow-y:auto}
+.step-title{font-size:15px;color:#7fdbff;padding:15px;border-bottom:1px solid #3a3a6e}
+.step-desc{font-size:12px;color:#ccc;padding:10px 15px;line-height:1.5}
+.ops{padding:8px 15px;display:flex;flex-direction:column;gap:6px}
+.op-btn{background:linear-gradient(135deg,#2e4e6e,#3e5e7e);border:1px solid #5e7e9e;color:#7fdbff;padding:8px 12px;cursor:pointer;font-size:13px;border-radius:5px;text-align:left;transition:all .2s}
+.op-btn:hover{background:linear-gradient(135deg,#3e5e8e,#4e6e9e);transform:translateX(3px)}
+.op-btn.done{background:#1e3e1e;border-color:#3e7e3e;color:#7fff7f}
+.score-bar{height:36px;background:#0a0a2e;display:flex;align-items:center;padding:0 15px;border-top:2px solid #4a4a8e}
+.score-bar .label{font-size:12px;color:#aaa}
+.score-bar .val{font-size:14px;color:#7fdbff;margin-left:8px}
+.score-bar .total{font-size:12px;color:#888;margin-left:auto}
+.progress{height:22px;background:#0a0a2e;padding:0 15px;display:flex;align-items:center;gap:3px}
+.pdot{width:16px;height:16px;border-radius:50%;border:2px solid #4a4a8e;background:transparent;cursor:pointer;position:relative}
+.pdot.active{background:#7fdbff;border-color:#7fdbff}
+.pdot.done{background:#3e7e3e;border-color:#3e7e3e}
+.result-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);display:none;z-index:1000;align-items:center;justify-content:center}
+.result-modal.show{display:flex}
+.result-card{background:linear-gradient(135deg,#1e2e4e,#2e3e6e);border:2px solid #7fdbff;padding:25px;border-radius:10px;max-width:500px;width:90%}
+.result-card h2{color:#7fdbff;font-size:20px;margin-bottom:12px;text-align:center}
+.result-card table{width:100%;border-collapse:collapse;margin:10px 0}
+.result-card th,.result-card td{border:1px solid #3a3a6e;padding:6px;font-size:12px;text-align:center}
+.result-card th{background:#2a3a5a;color:#7fdbff}
+.result-card td{color:#ccc}
+.result-card .total-score{font-size:24px;color:#7fdbff;text-align:center;margin-top:12px}
+.close-btn{background:#7fdbff;color:#0a0a2e;padding:6px 16px;cursor:pointer;border:none;border-radius:5px;font-size:13px;margin-top:12px;display:block;margin-left:auto}
+</style></head><body>
+<div id="app">
+<div class="top-bar"><h1>粪便样本的采集与寄生虫的分离与鉴定 — 3D虚拟仿真</h1><div class="step-info" id="stepInfo">步骤 1/7</div></div>
+<div class="main">
+<div class="canvas-wrap"><canvas id="simCanvas"></canvas></div>
+<div class="panel">
+<div class="progress" id="progress"></div>
+<div class="step-title" id="stepTitle">粪便样本采集</div>
+<div class="step-desc" id="stepDesc">使用无菌粪便采集盒收集新鲜粪便5~10g。尽量选取含黏液、脓血等异常部分。避免混入尿液、水、泥土。1h内检查最佳。</div>
+<div class="ops" id="ops"></div>
+<div class="score-bar"><span class="label">当前得分：</span><span class="val" id="curScore">0</span><span class="total">/ 72</span></div>
+</div>
+</div>
+<div class="result-modal" id="resultModal">
+<div class="result-card">
+<h2>寄生虫检测结果报告</h2>
+<table><tr><th>虫种</th><th>检出方法</th><th>数量</th><th>感染强度</th></tr>
+<tr><td>猪蛔虫</td><td>浮聚法</td><td>多个虫卵</td><td>中度</td></tr>
+<tr><td>钩虫</td><td>浮聚法</td><td>少量虫卵</td><td>轻度</td></tr>
+<tr><td>球虫</td><td>直接涂片</td><td>卵囊</td><td>轻度</td></tr></table>
+<div class="total-score" id="finalScore">总分：0/72</div>
+<button class="close-btn" onclick="document.getElementById('resultModal').classList.remove('show')">关闭</button>
+</div></div></div>
+<script>
+const S=[
+{n:'粪便样本采集',d:'无菌采集盒收集新鲜粪便5~10g→选取异常部分→避免混入尿液水→1h内检查→记录动物信息',ops:['准备采集盒','选取异常部分','采集5~10g','避免污染','记录信息'],scene:'collect'},
+{n:'直接涂片法',d:'滴生理盐水于载玻片→挑取火柴头大小粪便涂匀→加盖玻片→10×扫描→40×鉴定虫卵→连续3张涂片',ops:['滴生理盐水','挑取粪便','涂匀制片','加盖玻片','10×低倍镜扫描','40×高倍鉴定'],scene:'smear'},
+{n:'碘液染色涂片',d:'滴卢戈氏碘液代替盐水→涂片→原虫包囊染棕黄色→重点观察贾第鞭毛虫包囊（椭圆形含4核）',ops:['滴碘液','挑取粪便涂匀','加盖玻片','镜检包囊','鉴定贾第鞭毛虫'],scene:'iodine'},
+{n:'饱和盐水浮聚法',d:'取1g粪便+饱和盐水搅拌→加盐水至近管口→盖玻片接触液面1min→取下盖玻片制片→镜检浮起虫卵',ops:['取1g粪便','加饱和盐水','搅拌混悬','加盐水至管口','盖玻片接触1min','取下制片镜检'],scene:'float'},
+{n:'离心沉淀法',d:'5g粪便+10~20倍水搅拌→筛网过滤→离心1500rpm 5min→倾去上清→取沉渣镜检→查找吸虫卵',ops:['取5g粪便','加水搅拌','筛网过滤','离心5min','取沉渣','镜检吸虫卵'],scene:'sediment'},
+{n:'改良抗酸染色',d:'粪便薄涂片→甲醇固定→石炭酸复红20min→盐酸乙醇脱色→孔雀石绿复染→油镜检查隐孢子虫卵囊',ops:['薄涂片','甲醇固定','复红染色20min','脱色1min','孔雀石绿复染','油镜检查'],scene:'acidfast'},
+{n:'鉴定与报告',d:'根据虫卵形态对照图谱鉴定种类→判定感染强度→出具寄生虫检测报告→建议治疗方案',ops:['对照图谱鉴定','判定感染强度','出具报告','建议方案'],scene:'report'}
+];
+let curStep=0,curOp=0,score=0,sceneAngles={x:0,y:0},zoom=1,t=0;
+const cvs=document.getElementById('simCanvas'),ctx=cvs.getContext('2d');
+let W,H,mouseDown=false,lastMX=0,lastMY=0;
+function resize(){W=cvs.clientWidth;H=cvs.clientHeight;cvs.width=W;cvs.height=H}
+window.addEventListener('resize',resize);resize();
+cvs.addEventListener('mousedown',e=>{mouseDown=true;lastMX=e.clientX;lastMY=e.clientY});
+cvs.addEventListener('mouseup',()=>mouseDown=false);
+cvs.addEventListener('mousemove',e=>{if(mouseDown){sceneAngles.y+=(e.clientX-lastMX)*0.005;sceneAngles.x+=(e.clientY-lastMY)*0.005;lastMX=e.clientX;lastMY=e.clientY}});
+cvs.addEventListener('wheel',e=>{zoom=Math.max(0.5,Math.min(3,zoom-e.deltaY*0.001))});
+
+function project(x,y,z){
+const cx=Math.cos(sceneAngles.x),sx=Math.sin(sceneAngles.x),cy=Math.cos(sceneAngles.y),sy=Math.sin(sceneAngles.y);
+let y1=y*cx-z*sx,z1=y*sx+z*cx,x1=x*cy+z1*sy,z2=x*-sy+z1*cy;
+const d=600,s=d/(d+z2*zoom);
+return{x:W/2+x1*s*zoom,y:H/2+y1*s*zoom,s,z2};
+}
+
+function drawStep(){
+ctx.clearRect(0,0,W,H);t+=0.02;
+const sc=curStep;
+if(sc===0) drawCollect();
+else if(sc===1) drawSmear();
+else if(sc===2) drawIodine();
+else if(sc===3) drawFloat();
+else if(sc===4) drawSediment();
+else if(sc===5) drawAcidFast();
+else drawReport();
+}
+
+function drawCollect(){
+// sample container
+const cx2=project(0,0,0);
+ctx.fillStyle='#6a5a40';ctx.fillRect(cx2.x-35*cx2.s,cx2.y-50*cx2.s,70*cx2.s,100*cx2.s);
+ctx.fillStyle='#8a7050';ctx.fillRect(cx2.x-30*cx2.s,cx2.y-20*cx2.s,60*cx2.s,65*cx2.s);
+ctx.strokeStyle='#7fdbff';ctx.lineWidth=1;ctx.strokeRect(cx2.x-35*cx2.s,cx2.y-50*cx2.s,70*cx2.s,100*cx2.s);
+if(curOp>=4){
+ctx.fillStyle='#7fdbff';ctx.font=`${10*cx2.s}px sans-serif`;
+ctx.fillText('猪粪便 5g',cx2.x-25*cx2.s,cx2.y-40*cx2.s);
+ctx.fillText('1h内检查',cx2.x-25*cx2.s,cx2.y+60*cx2.s);
+}
+ctx.fillStyle='#7fdbff';ctx.font='14px sans-serif';
+ctx.fillText('粪便采集 - 操作'+(curOp+1),W/2-80,H-25);
+}
+
+function drawSmear(){
+// microscope slide
+const sx2=project(0,0,0);
+ctx.fillStyle='#d0e0f0';ctx.fillRect(sx2.x-120*sx2.s,sx2.y-30*sx2.s,240*sx2.s,60*sx2.s);
+ctx.strokeStyle='#8090a0';ctx.lineWidth=1;ctx.strokeRect(sx2.x-120*sx2.s,sx2.y-30*sx2.s,240*sx2.s,60*sx2.s);
+// smear area
+if(curOp>=3){
+ctx.fillStyle='#8a7050';ctx.fillRect(sx2.x-60*sx2.s,sx2.y-15*sx2.s,120*sx2.s,30*sx2.s);
+}
+// cover slip
+if(curOp>=3){
+ctx.fillStyle='rgba(200,220,240,0.5)';ctx.fillRect(sx2.x-50*sx2.s,sx2.y-12*sx2.s,100*sx2.s,24*sx2.s);
+}
+// egg shapes at high magnification
+if(curOp>=5){
+ctx.fillStyle='#7fdbff';ctx.font='10px sans-serif';ctx.fillText('→40×鉴定虫卵',sx2.x+70*sx2.s,sx2.y+10*sx2.s);
+// ascaris egg (oval, thick shell)
+ctx.strokeStyle='#b08040';ctx.lineWidth=2;
+ctx.beginPath();ctx.ellipse(sx2.x+80*sx2.s,sx2.y-40*sx2.s,15*sx2.s,10*sx2.s,0,0,Math.PI*2);ctx.stroke();
+ctx.fillStyle='#b08040';ctx.font='8px sans-serif';ctx.fillText('蛔虫卵',sx2.x+100*sx2.s,sx2.y-40*sx2.s);
+}
+ctx.fillStyle='#7fdbff';ctx.font='14px sans-serif';ctx.fillText('直接涂片 - 操作'+(curOp+1),W/2-80,H-25);
+}
+
+function drawIodine(){
+const sx2=project(0,0,0);
+ctx.fillStyle='#d0e0f0';ctx.fillRect(sx2.x-120*sx2.s,sx2.y-30*sx2.s,240*sx2.s,60*sx2.s);
+if(curOp>=2){
+ctx.fillStyle='#b8860b';ctx.fillRect(sx2.x-60*sx2.s,sx2.y-15*sx2.s,120*sx2.s,30*sx2.s);
+}
+if(curOp>=4){
+// Giardia cyst (oval, 4 nuclei)
+ctx.strokeStyle='#a08040';ctx.lineWidth=1.5;
+ctx.beginPath();ctx.ellipse(sx2.x+60*sx2.s,sx2.y-40*sx2.s,12*sx2.s,8*sx2.s,0,0,Math.PI*2);ctx.stroke();
+for(let i=0;i<4;i++){ctx.fillStyle='#604020';ctx.beginPath();ctx.arc(sx2.x+56+i*5*sx2.s,sx2.y-42*sx2.s,2,0,Math.PI*2);ctx.fill();}
+ctx.fillStyle='#7fdbff';ctx.font='9px sans-serif';ctx.fillText('贾第鞭毛虫包囊',sx2.x+80*sx2.s,sx2.y-40*sx2.s);
+}
+ctx.fillStyle='#7fdbff';ctx.font='14px sans-serif';ctx.fillText('碘液染色 - 操作'+(curOp+1),W/2-80,H-25);
+}
+
+function drawFloat(){
+// test tube with saturated salt water
+const tx=project(0,0,0);
+const h=140*tx.s,w=28*tx.s;
+ctx.fillStyle='#c0d0e0';ctx.fillRect(tx.x-w/2,tx.y-h,w,h);
+ctx.strokeStyle='#7fdbff';ctx.lineWidth=1;ctx.strokeRect(tx.x-w/2,tx.y-h,w,h);
+// salt water (above feces)
+ctx.fillStyle='#d8e8ff';
+ctx.fillRect(tx.x-w/2+2,tx.y-h+10*tx.s,w-4,h*0.7);
+// floating eggs at surface
+if(curOp>=5){
+ctx.strokeStyle='#b08040';ctx.lineWidth=2;
+for(let i=0;i<3;i++){
+const ey=tx.y-h+15*tx.s+i*5;
+ctx.beginPath();ctx.ellipse(tx.x+i*3-5,ey,8,5,0,0,Math.PI*2);ctx.stroke();
+}
+ctx.fillStyle='#7fdbff';ctx.font='10px sans-serif';
+ctx.fillText('钩虫卵↑浮于液面',tx.x+20,tx.y-h+20);
+}
+ctx.fillStyle='#7fdbff';ctx.font='14px sans-serif';ctx.fillText('浮聚法 - 操作'+(curOp+1),W/2-80,H-25);
+}
+
+function drawSediment(){
+// centrifuge tube
+const tx=project(0,0,0);
+const h=120*tx.s,w=24*tx.s;
+ctx.fillStyle='#406080';ctx.fillRect(tx.x-w/2,tx.y-h,w,h);
+ctx.strokeStyle='#7fdbff';ctx.lineWidth=1;ctx.strokeRect(tx.x-w/2,tx.y-h,w,h);
+// sediment at bottom
+if(curOp>=5){
+ctx.fillStyle='#6a5a40';ctx.fillRect(tx.x-w/2+2,tx.y-15*tx.s,w-4,15*tx.s);
+// fluke egg (large, operculated)
+ctx.strokeStyle='#b08040';ctx.lineWidth=2;
+ctx.beginPath();ctx.ellipse(tx2=project(60,0,0).x,tx.y-30*tx.s,18*tx.s,12*tx.s,0,0,Math.PI*2);ctx.stroke();
+ctx.fillStyle='#7fdbff';ctx.font='10px sans-serif';ctx.fillText('肝片吸虫卵(有盖)',tx.x+30,tx.y-30*tx.s);
+}
+ctx.fillStyle='#7fdbff';ctx.font='14px sans-serif';ctx.fillText('沉淀法 - 操作'+(curOp+1),W/2-80,H-25);
+}
+
+function drawAcidFast(){
+// slide with stained smear
+const sx2=project(0,0,0);
+ctx.fillStyle='#d0e0f0';ctx.fillRect(sx2.x-120*sx2.s,sx2.y-30*sx2.s,240*sx2.s,60*sx2.s);
+if(curOp>=5){
+// Crypto oocysts (rose-red, tiny circles)
+ctx.fillStyle='#e04080';
+for(let i=0;i<6;i++){
+ctx.beginPath();ctx.arc(sx2.x-40+i*20*sx2.s,sx2.y-10*sx2.s,3,0,Math.PI*2);ctx.fill();
+}
+ctx.fillStyle='#40a040';ctx.fillRect(sx2.x-80*sx2.s,sx2.y-5*sx2.s,160*sx2.s,10*sx2.s);
+ctx.fillStyle='#7fdbff';ctx.font='9px sans-serif';
+ctx.fillText('隐孢子虫卵囊(玫红色 2~6μm)',sx2.x-60,sx2.y+25*sx2.s);
+}
+ctx.fillStyle='#7fdbff';ctx.font='14px sans-serif';ctx.fillText('抗酸染色 - 操作'+(curOp+1),W/2-80,H-25);
+}
+
+function drawReport(){
+ctx.fillStyle='#1e1e4e';ctx.fillRect(0,0,W,H);
+ctx.fillStyle='#7fdbff';ctx.font='18px sans-serif';ctx.fillText('寄生虫检测报告',W/2-70,H/2-120);
+ctx.fillStyle='#ccc';ctx.font='13px sans-serif';
+ctx.fillText('检出寄生虫：',W/2-120,H/2-80);
+ctx.fillText('1. 猪蛔虫卵 (浮聚法) - 中度感染',W/2-120,H/2-60);
+ctx.fillText('2. 钩虫卵 (浮聚法) - 轻度感染',W/2-120,H/2-40);
+ctx.fillText('3. 球虫卵囊 (直接涂片) - 轻度感染',W/2-120,H/2-20);
+ctx.fillText('4. 隐孢子虫卵囊 (抗酸染色) - 轻度感染',W/2-120,H/2);
+ctx.fillStyle='#3e7e3e';ctx.font='14px sans-serif';
+ctx.fillText('建议：阿苯达唑驱虫 + 环境消毒 + 改善饲养',W/2-120,H/2+40);
+ctx.fillStyle='#7fdbff';ctx.font='22px sans-serif';ctx.fillText('综合评分: '+score+'/72',W/2-80,H/2+80);
+}
+
+function speak(text){const u=new SpeechSynthesisUtterance(text);u.lang='zh-CN';u.pitch=0.75;u.rate=0.85;speechSynthesis.speak(u)}
+
+function updateUI(){
+const step=S[curStep];
+document.getElementById('stepTitle').textContent=step.n;
+document.getElementById('stepDesc').textContent=step.d;
+document.getElementById('stepInfo').textContent='步骤 '+((curStep+1))+'/7';
+document.getElementById('curScore').textContent=score;
+const opsDiv=document.getElementById('ops');opsDiv.innerHTML='';
+step.ops.forEach((op,i)=>{
+const btn=document.createElement('div');
+btn.className='op-btn'+(i<curOp?' done':'');
+btn.textContent=(i<curOp?'✓ ':'')+(i+1)+'. '+op;
+btn.onclick=()=>doOp(i);
+opsDiv.appendChild(btn);
+});
+const prog=document.getElementById('progress');prog.innerHTML='';
+S.forEach((s,i)=>{
+const dot=document.createElement('div');
+dot.className='pdot'+(i===curStep?' active':i<curStep?' done':'');
+dot.setAttribute('data-label',s.n);
+dot.onclick=()=>{if(i<=curStep){curStep=i;curOp=0;updateUI()}};
+prog.appendChild(dot);
+});
+}
+
+function doOp(i){
+if(i!==curOp)return;score+=2;curOp++;
+speak(S[curStep].ops[i]+' - 完成');
+if(curOp>=S[curStep].ops.length){
+if(curStep<S.length-1){curStep++;curOp=0;speak('进入步骤：'+S[curStep].n);}
+else{speak('实验全部完成');showResults();}
+}
+updateUI();
+}
+
+function showResults(){document.getElementById('resultModal').classList.add('show');document.getElementById('finalScore').textContent='总分：'+score+'/72'}
+
+function animate(){drawStep();requestAnimationFrame(animate)}
+updateUI();animate();
+</script></body></html>
