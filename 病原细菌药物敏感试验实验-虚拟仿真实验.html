@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>病原细菌药物敏感试验实验 - 3D虚拟仿真</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a2e;font-family:'Microsoft YaHei',sans-serif;color:#e0e0e0;overflow:hidden}
+#app{width:100vw;height:100vh;display:flex;flex-direction:column}
+.top-bar{height:50px;background:linear-gradient(135deg,#1a1a4e,#2a2a6e);display:flex;align-items:center;padding:0 20px;border-bottom:2px solid #4a4a8e}
+.top-bar h1{font-size:18px;color:#7fdbff;letter-spacing:2px}
+.top-bar .step-info{font-size:14px;color:#aaa;margin-left:auto}
+.main{flex:1;display:flex;overflow:hidden}
+.canvas-wrap{flex:1;position:relative;background:#0a0a2e}
+#simCanvas{width:100%;height:100%;display:block}
+.panel{width:320px;background:linear-gradient(180deg,#1e1e4e,#12123e);border-left:2px solid #4a4a8e;display:flex;flex-direction:column;overflow-y:auto}
+.step-title{font-size:16px;color:#7fdbff;padding:15px;border-bottom:1px solid #3a3a6e}
+.step-desc{font-size:13px;color:#ccc;padding:12px 15px;line-height:1.6}
+.ops{padding:10px 15px;display:flex;flex-direction:column;gap:8px}
+.op-btn{background:linear-gradient(135deg,#2e4e6e,#3e5e7e);border:1px solid #5e7e9e;color:#7fdbff;padding:10px 15px;cursor:pointer;font-size:14px;border-radius:6px;text-align:left;transition:all .2s}
+.op-btn:hover{background:linear-gradient(135deg,#3e5e8e,#4e6e9e);transform:translateX(3px)}
+.op-btn.done{background:#1e3e1e;border-color:#3e7e3e;color:#7fff7f}
+.score-bar{height:40px;background:#0a0a2e;display:flex;align-items:center;padding:0 15px;border-top:2px solid #4a4a8e}
+.score-bar .label{font-size:13px;color:#aaa}
+.score-bar .val{font-size:15px;color:#7fdbff;margin-left:10px}
+.score-bar .total{font-size:13px;color:#888;margin-left:auto}
+.progress{height:24px;background:#0a0a2e;padding:0 15px;display:flex;align-items:center;gap:4px}
+.pdot{width:18px;height:18px;border-radius:50%;border:2px solid #4a4a8e;background:transparent;cursor:pointer;position:relative}
+.pdot.active{background:#7fdbff;border-color:#7fdbff}
+.pdot.done{background:#3e7e3e;border-color:#3e7e3e}
+.pdot:hover::after{content:attr(data-label);position:absolute;top:-28px;left:50%;transform:translateX(-50%);font-size:11px;color:#7fdbff;white-space:nowrap}
+.voice-btn{background:linear-gradient(135deg,#4e2e6e,#6e3e8e);border:1px solid #8e5eae;color:#d0a0ff;padding:6px 12px;cursor:pointer;font-size:12px;border-radius:4px;margin-left:10px}
+.result-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);display:none;z-index:1000;align-items:center;justify-content:center}
+.result-modal.show{display:flex}
+.result-card{background:linear-gradient(135deg,#1e2e4e,#2e3e6e);border:2px solid #7fdbff;padding:30px;border-radius:12px;max-width:500px;width:90%}
+.result-card h2{color:#7fdbff;font-size:22px;margin-bottom:15px;text-align:center}
+.result-card table{width:100%;border-collapse:collapse;margin:15px 0}
+.result-card th,.result-card td{border:1px solid #4a4a8e;padding:8px;font-size:13px;text-align:center}
+.result-card th{background:#2a3a5a;color:#7fdbff}
+.result-card td{color:#ccc}
+.result-card .total-score{font-size:28px;color:#7fdbff;text-align:center;margin-top:15px}
+.close-btn{background:#7fdbff;color:#0a0a2e;padding:8px 20px;cursor:pointer;border:none;border-radius:6px;font-size:14px;margin-top:15px;display:block;margin-left:auto}
+</style></head><body>
+<div id="app">
+<div class="top-bar"><h1>病原细菌药物敏感试验 — 3D虚拟仿真</h1><div class="step-info" id="stepInfo">步骤 1/6</div></div>
+<div class="main">
+<div class="canvas-wrap"><canvas id="simCanvas"></canvas></div>
+<div class="panel">
+<div class="progress" id="progress"></div>
+<div class="step-title" id="stepTitle">菌液制备</div>
+<div class="step-desc" id="stepDesc">从18~24h纯培养平板上挑取3~5个形态相似的菌落，接种于4~5mL营养肉汤中，35℃培养至浊度≥0.5麦氏标准。用0.5麦氏浊度标准管校准菌液浓度。</div>
+<div class="ops" id="ops"></div>
+<div class="score-bar"><span class="label">当前得分：</span><span class="val" id="curScore">0</span><span class="total">/ 72</span></div>
+</div>
+</div>
+<div class="result-modal" id="resultModal">
+<div class="result-card">
+<h2>药敏试验结果报告</h2>
+<table><tr><th>药敏纸片</th><th>含量</th><th>抑菌圈(mm)</th><th>判读</th></tr>
+<tr><td>青霉素G</td><td>10 IU</td><td id="r1">-</td><td id="r1j">-</td></tr>
+<tr><td>庆大霉素</td><td>10μg</td><td id="r2">-</td><td id="r2j">-</td></tr>
+<tr><td>恩诺沙星</td><td>5μg</td><td id="r3">-</td><td id="r3j">-</td></tr>
+<tr><td>阿米卡星</td><td>30μg</td><td id="r4">-</td><td id="r4j">-</td></tr>
+<tr><td>头孢噻呋</td><td>30μg</td><td id="r5">-</td><td id="r5j">-</td></tr>
+<tr><td>多西环素</td><td>30μg</td><td id="r6">-</td><td id="r6j">-</td></tr>
+<tr><td>氟苯尼考</td><td>30μg</td><td id="r7">-</td><td id="r7j">-</td></tr></table>
+<div class="total-score" id="finalScore">总分：0/72</div>
+<button class="close-btn" onclick="document.getElementById('resultModal').classList.remove('show')">关闭</button>
+</div></div></div>
+<script>
+const S=[
+{n:'菌液制备',d:'从纯培养平板挑取3~5个相似菌落→接种于4~5mL营养肉汤→35℃培养至浊度≥0.5麦氏标准→用0.5麦氏标准管校准浓度',ops:['挑取菌落','接种肉汤','培养增菌','校准浊度'],scene:'broth'},
+{n:'平板接种',d:'用无菌棉拭子浸入0.5麦氏菌悬液→在M-H琼脂表面均匀涂布3次（每次旋转60°）→涂抹琼脂边缘→静置3~5min',ops:['浸蘸菌液','第一遍涂布','旋转60°涂布','再旋转涂布','涂边缘','静置干燥'],scene:'plate'},
+{n:'贴放药敏纸片',d:'用无菌镊子取7种药敏纸片贴于平板表面，间距≥24mm，距边缘≥15mm，90mm平板最多6片→轻压贴合',ops:['取青霉素G纸片','取庆大霉素纸片','取恩诺沙星纸片','取阿米卡星纸片','取头孢噻呋纸片','取多西环素纸片','取氟苯尼考纸片'],scene:'disk'},
+{n:'孵育培养',d:'平板倒置放入35±2℃培养箱，孵育16~18h。观察菌苔生长情况与抑菌圈形成',ops:['倒置平板','放入培养箱','设置35℃','孵育18h','取出观察'],scene:'incubator'},
+{n:'测量抑菌圈',d:'用游标卡尺从平板背面测量7个纸片的抑菌圈直径（精确至mm），对照CLSI折点判读S/I/R',ops:['测量青霉素G圈','测量庆大霉素圈','测量恩诺沙星圈','测量阿米卡星圈','测量头孢噻呋圈','测量多西环素圈','测量氟苯尼考圈'],scene:'measure'},
+{n:'结果判读与报告',d:'将各纸片抑菌圈直径对照CLSI M100折点表，判读为S/I/R，记录质控结果，出具药敏报告',ops:['对照折点判读','确认质控有效','出具报告'],scene:'report'}
+];
+let curStep=0,curOp=0,score=0,sceneAngles={x:0,y:0};
+const discData=[
+{name:'青霉素G',dose:'10IU',zone:18,interp:'R',breakpt:'S≥29 R≤28'},
+{name:'庆大霉素',dose:'10μg',zone:16,interp:'I',breakpt:'S≥15 I13-14 R≤12'},
+{name:'恩诺沙星',dose:'5μg',zone:22,interp:'S',breakpt:'S≥21 I16-20 R≤15'},
+{name:'阿米卡星',dose:'30μg',zone:18,interp:'S',breakpt:'S≥17 I15-16 R≤14'},
+{name:'头孢噻呋',dose:'30μg',zone:23,interp:'S',breakpt:'S≥21 I16-20 R≤15'},
+{name:'多西环素',dose:'30μg',zone:14,interp:'I',breakpt:'S≥16 I13-15 R≤12'},
+{name:'氟苯尼考',dose:'30μg',zone:20,interp:'S',breakpt:'S≥18 I13-17 R≤12'}
+];
+const cvs=document.getElementById('simCanvas'),ctx=cvs.getContext('2d');
+let W,H,mouseDown=false,lastMX=0,lastMY=0;
+function resize(){W=cvs.clientWidth;H=cvs.clientHeight;cvs.width=W;cvs.height=H}
+window.addEventListener('resize',resize);resize();
+cvs.addEventListener('mousedown',e=>{mouseDown=true;lastMX=e.clientX;lastMY=e.clientY});
+cvs.addEventListener('mouseup',()=>mouseDown=false);
+cvs.addEventListener('mousemove',e=>{if(mouseDown){sceneAngles.y+=(e.clientX-lastMX)*0.005;sceneAngles.x+=(e.clientY-lastMY)*0.005;lastMX=e.clientX;lastMY=e.clientY}});
+cvs.addEventListener('wheel',e=>{zoom=Math.max(0.5,Math.min(3,zoom-e.deltaY*0.001))});
+let zoom=1,t=0;
+
+function project(x,y,z){
+const cx=Math.cos(sceneAngles.x),sx=Math.sin(sceneAngles.x),cy=Math.cos(sceneAngles.y),sy=Math.sin(sceneAngles.y);
+let y1=y*cx-z*sx,z1=y*sx+z*cx,x1=x*cy+z1*sy,z2=x*-sy+z1*cy;
+const d=600,s=d/(d+z2*zoom);
+return{x:W/2+x1*s*zoom,y:H/2+y1*s*zoom,s,z2};
+}
+
+function drawStep(){
+ctx.clearRect(0,0,W,H);
+t+=0.02;
+const sc=curStep;
+if(sc===0) drawBroth();
+else if(sc===1) drawPlate();
+else if(sc===2) drawDisks();
+else if(sc===3) drawIncubator();
+else if(sc===4) drawMeasurement();
+else if(sc===5) drawReport();
+}
+
+function drawBroth(){
+// test tubes
+for(let i=0;i<3;i++){
+const px=project(-80+i*80,0,0);
+const h=120,w=30;
+ctx.fillStyle=i===1&&curOp>=2?'#b8860b':'#404080';
+ctx.fillRect(px.x-w/2*px.s,px.y-h*px.s,w*px.s,h*px.s);
+ctx.strokeStyle='#7fdbff';ctx.lineWidth=1;
+ctx.strokeRect(px.x-w/2*px.s,px.y-h*px.s,w*px.s,h*px.s);
+}
+// McFarland tube
+const pm=project(80,0,0);
+ctx.fillStyle=curOp>=3?'#b8860b':'#404080';
+ctx.fillRect(pm.x-15*pm.s,pm.y-120*pm.s,30*pm.s,120*pm.s);
+ctx.fillStyle='#7fdbff';ctx.font=`${12*pm.s}px sans-serif`;ctx.fillText('0.5麦氏',pm.x-30*pm.s,pm.y+20*pm.s);
+// label
+ctx.fillStyle='#7fdbff';ctx.font='16px sans-serif';
+ctx.fillText('菌液制备 - 步骤'+(curOp+1),W/2-100,H-30);
+}
+
+function drawPlate(){
+// agar plate
+const pc=project(0,0,0);
+const r=140*pc.s;
+ctx.fillStyle='#d4a860';
+ctx.beginPath();ctx.ellipse(pc.x,pc.y,r,r*0.3,0,0,Math.PI*2);ctx.fill();
+ctx.strokeStyle='#aa8040';ctx.lineWidth=2;ctx.stroke();
+// streak lines
+if(curOp>=1){
+ctx.strokeStyle='#907050';ctx.lineWidth=2;
+ctx.beginPath();ctx.moveTo(pc.x-r*0.8,pc.y);ctx.lineTo(pc.x+r*0.8,pc.y);ctx.stroke();
+}
+if(curOp>=2){
+ctx.beginPath();ctx.moveTo(pc.x,pc.y-r*0.25);ctx.lineTo(pc.x,pc.y+r*0.25);ctx.stroke();
+}
+if(curOp>=3){
+ctx.beginPath();ctx.moveTo(pc.x-r*0.5,pc.y-r*0.15);ctx.lineTo(pc.x+r*0.5,pc.y+r*0.15);ctx.stroke();
+}
+if(curOp>=5){
+ctx.fillStyle='#d4a860';ctx.fillRect(pc.x-r*0.9,pc.y-r*0.28,r*1.8*pc.s,r*0.56*pc.s);
+ctx.fillStyle='#7fdbff';ctx.font='14px sans-serif';ctx.fillText('菌苔已形成',pc.x-40,pc.y-5);
+}
+ctx.fillStyle='#7fdbff';ctx.font='16px sans-serif';
+ctx.fillText('平板接种 - 操作'+(curOp+1),W/2-100,H-30);
+}
+
+function drawDisks(){
+const pc=project(0,0,0);
+const r=140*pc.s;
+// lawn culture
+ctx.fillStyle='#d4a860';
+ctx.beginPath();ctx.ellipse(pc.x,pc.y,r,r*0.3,0,0,Math.PI*2);ctx.fill();
+// disks
+const positions=[[-60,-20],[-20,-20],[20,-20],[60,-20],[-60,20],[-20,20],[20,20]];
+const colors=['#ff6060','#60ff60','#6060ff','#ff60ff','#ffff60','#60ffff','#ff8040'];
+for(let i=0;i<7;i++){
+if(curOp>=i+1){
+const dp=project(positions[i][0],positions[i][1],5);
+const ds=8*dp.s;
+ctx.fillStyle=colors[i];
+ctx.beginPath();ctx.arc(dp.x,dp.y,ds,0,Math.PI*2);ctx.fill();
+ctx.fillStyle='#fff';ctx.font=`${8*dp.s}px sans-serif`;
+ctx.fillText(discData[i].name.substring(0,2),dp.x-ds,dp.y+ds*0.3);
+}
+}
+ctx.strokeStyle='#aa8040';ctx.lineWidth=2;
+ctx.beginPath();ctx.ellipse(pc.x,pc.y,r,r*0.3,0,0,Math.PI*2);ctx.stroke();
+ctx.fillStyle='#7fdbff';ctx.font='16px sans-serif';
+ctx.fillText('贴放药敏纸片 - 纸片'+(curOp+1),W/2-100,H-30);
+}
+
+function drawIncubator(){
+// incubator box
+const bx=project(0,0,0);
+ctx.fillStyle='#505070';
+ctx.fillRect(bx.x-160*bx.s,bx.y-100*bx.s,320*bx.s,200*bx.s);
+ctx.strokeStyle='#7fdbff';ctx.lineWidth=2;
+ctx.strokeRect(bx.x-160*bx.s,bx.y-100*bx.s,320*bx.s,200*bx.s);
+// plate inside
+ctx.fillStyle='#d4a860';
+ctx.fillRect(bx.x-60*bx.s,bx.y-30*bx.s,120*bx.s,60*bx.s);
+// temperature display
+ctx.fillStyle='#0f0';ctx.font=`${20*bx.s}px sans-serif`;
+const temp=curOp>=3?35+'°C':'--°C';
+ctx.fillText(temp,bx.x-50*bx.s,bx.y+60*bx.s);
+// timer
+if(curOp>=3){
+ctx.fillStyle='#ff0';ctx.font='14px sans-serif';
+const hrs=Math.min(18,Math.floor(t*2));
+ctx.fillText('孵育: '+hrs+'h / 18h',bx.x-60*bx.s,bx.y+80*bx.s);
+}
+ctx.fillStyle='#7fdbff';ctx.font='16px sans-serif';
+ctx.fillText('孵育培养 - 操作'+(curOp+1),W/2-100,H-30);
+}
+
+function drawMeasurement(){
+const pc=project(0,0,0);
+const r=140*pc.s;
+// plate with zones
+ctx.fillStyle='#d4a860';
+ctx.beginPath();ctx.ellipse(pc.x,pc.y,r,r*0.3,0,0,Math.PI*2);ctx.fill();
+const positions=[[-60,-20],[-20,-20],[20,-20],[60,-20],[-60,20],[-20,20],[20,20]];
+const colors=['#ff6060','#60ff60','#6060ff','#ff60ff','#ffff60','#60ffff','#ff8040'];
+for(let i=0;i<7;i++){
+const dp=project(positions[i][0],positions[i][1],5);
+const ds=8*dp.s;
+// disk
+ctx.fillStyle=colors[i];
+ctx.beginPath();ctx.arc(dp.x,dp.y,ds,0,Math.PI*2);ctx.fill();
+// zone
+if(curOp>=i+1){
+const zr=discData[i].zone*1.5*dp.s;
+ctx.fillStyle='#d4a860';
+ctx.beginPath();ctx.arc(dp.x,dp.y,zr,0,Math.PI*2);ctx.fill();
+ctx.strokeStyle='#ff0';ctx.lineWidth=1;
+ctx.beginPath();ctx.arc(dp.x,dp.y,zr,0,Math.PI*2);ctx.stroke();
+ctx.fillStyle='#0f0';ctx.font=`${10*dp.s}px sans-serif`;
+ctx.fillText(discData[i].zone+'mm',dp.x+zr+5,dp.y);
+}
+}
+ctx.strokeStyle='#aa8040';ctx.lineWidth=2;
+ctx.beginPath();ctx.ellipse(pc.x,pc.y,r,r*0.3,0,0,Math.PI*2);ctx.stroke();
+ctx.fillStyle='#7fdbff';ctx.font='16px sans-serif';
+ctx.fillText('测量抑菌圈 - 纸片'+(curOp+1),W/2-100,H-30);
+}
+
+function drawReport(){
+ctx.fillStyle='#1e1e4e';ctx.fillRect(0,0,W,H);
+ctx.fillStyle='#7fdbff';ctx.font='20px sans-serif';
+ctx.fillText('药敏试验结果报告',W/2-100,H/2-120);
+ctx.fillStyle='#ccc';ctx.font='14px sans-serif';
+for(let i=0;i<7;i++){
+ctx.fillText(`${discData[i].name} (${discData[i].dose}): ${discData[i].zone}mm → ${discData[i].interp}`,W/2-160,H/2-80+i*25);
+}
+ctx.fillStyle='#3e7e3e';ctx.font='16px sans-serif';
+ctx.fillText('质控菌株ATCC 25922: 有效 ✓',W/2-120,H/2+100);
+ctx.fillStyle='#7fdbff';ctx.font='24px sans-serif';
+ctx.fillText('综合评分: '+score+'/72',W/2-80,H/2+130);
+}
+
+function speak(text){
+const u=new SpeechSynthesisUtterance(text);
+u.lang='zh-CN';u.pitch=0.75;u.rate=0.85;
+speechSynthesis.speak(u);
+}
+
+function updateUI(){
+const step=S[curStep];
+document.getElementById('stepTitle').textContent=step.n;
+document.getElementById('stepDesc').textContent=step.d;
+document.getElementById('stepInfo').textContent='步骤 '+((curStep+1))+'/6';
+document.getElementById('curScore').textContent=score;
+const opsDiv=document.getElementById('ops');
+opsDiv.innerHTML='';
+step.ops.forEach((op,i)=>{
+const btn=document.createElement('div');
+btn.className='op-btn'+(i<curOp?' done':'');
+btn.textContent=(i<curOp?'✓ ':'')+(i+1)+'. '+op;
+btn.onclick=()=>doOp(i);
+opsDiv.appendChild(btn);
+});
+const prog=document.getElementById('progress');
+prog.innerHTML='';
+S.forEach((s,i)=>{
+const dot=document.createElement('div');
+dot.className='pdot'+(i===curStep?' active':i<curStep?' done':'');
+dot.setAttribute('data-label',s.n);
+dot.onclick=()=>{if(i<=curStep)curStep=i;curOp=Math.min(curOp,0);updateUI()};
+prog.appendChild(dot);
+});
+}
+
+function doOp(i){
+if(i!==curOp)return;
+score+=2;
+curOp++;
+speak(S[curStep].ops[i]+' - 完成');
+if(curOp>=S[curStep].ops.length){
+if(curStep<S.length-1){curStep++;curOp=0;speak('进入步骤：'+S[curStep].n);}
+else{
+speak('实验全部完成，请查看结果报告');
+showResults();
+}
+}
+updateUI();
+}
+
+function showResults(){
+const m=document.getElementById('resultModal');
+m.classList.add('show');
+for(let i=0;i<7;i++){
+document.getElementById('r'+(i+1)).textContent=discData[i].zone+'mm';
+document.getElementById('r'+(i+1)+'j').textContent=discData[i].interp;
+}
+document.getElementById('finalScore').textContent='总分：'+score+'/72';
+}
+
+function animate(){drawStep();requestAnimationFrame(animate)}
+updateUI();animate();
+</script></body></html>
